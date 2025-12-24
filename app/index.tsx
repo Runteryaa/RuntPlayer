@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   StyleSheet,
   View,
@@ -107,8 +107,16 @@ export default function VideoPlayer() {
     }
   };
 
-  const togglePiP = () => {
-    console.log("PiP mode activated - video will enter PiP when app goes to background");
+  const videoViewRef = useRef<VideoView>(null);
+
+  const togglePiP = async () => {
+    if (videoViewRef.current) {
+      try {
+        await videoViewRef.current.startPictureInPicture();
+      } catch (error) {
+        console.log("Error starting PiP:", error);
+      }
+    }
   };
 
   const formatTime = (millis: number) => {
@@ -141,10 +149,12 @@ export default function VideoPlayer() {
         {videoUri ? (
           <>
             <VideoView
+              ref={videoViewRef}
               player={player}
               style={styles.video}
               allowsFullscreen
               allowsPictureInPicture
+              startsPictureInPictureAutomatically={true}
               contentFit="contain"
               nativeControls={false}
             />
