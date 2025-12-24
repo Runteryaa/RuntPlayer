@@ -28,6 +28,7 @@ export default function VideoPlayer() {
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(1.0);
+  const [isPiP, setIsPiP] = useState(false);
 
   useEffect(() => {
     setAudioModeAsync({
@@ -174,7 +175,9 @@ export default function VideoPlayer() {
               allowsPictureInPicture
               startsPictureInPictureAutomatically={true}
               contentFit="contain"
-              nativeControls={false}
+              nativeControls={isPiP}
+              onPictureInPictureStart={() => setIsPiP(true)}
+              onPictureInPictureStop={() => setIsPiP(false)}
             />
             
             {showControls && (
