@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   StyleSheet,
   View,
@@ -7,7 +7,8 @@ import {
   Dimensions,
   Pressable,
 } from "react-native";
-import { VideoView, useVideoPlayer } from "expo-video";
+import { VideoView, useVideoPlayer, VideoSource } from "expo-video";
+import { setAudioModeAsync } from "expo-audio";
 import * as DocumentPicker from "expo-document-picker";
 import {
   Play,
@@ -21,22 +22,33 @@ import { StatusBar } from "expo-status-bar";
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export default function VideoPlayer() {
-  const [videoUri, setVideoUri] = useState<string | null>(null);
+  const [videoSource, setVideoSource] = useState<VideoSource | null>(null);
   const [fileName, setFileName] = useState<string>("");
   const [showControls, setShowControls] = useState(true);
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(1.0);
 
-  const player = useVideoPlayer(videoUri, (player) => {
+  useEffect(() => {
+    setAudioModeAsync({
+      playsInSilentMode: true,
+      shouldPlayInBackground: true,
+      interruptionMode: "doNotMix",
+      interruptionModeAndroid: "doNotMix",
+    });
+  }, []);
+
+  const player = useVideoPlayer(videoSource, (player) => {
     player.loop = false;
     player.muted = false;
+    player.staysActiveInBackground = true;
+    player.showNowPlayingNotification = true;
   });
 
   const controlsTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (!videoUri) return;
+    if (!videoSource) return;
     const interval = setInterval(() => {
       try {
         if (player) {
@@ -48,7 +60,7 @@ export default function VideoPlayer() {
       }
     }, 100);
     return () => clearInterval(interval);
-  }, [player, videoUri]);
+  }, [player, videoSource]);
 
   const resetControlsTimeout = () => {
     if (controlsTimeout.current) {
@@ -71,7 +83,13 @@ export default function VideoPlayer() {
 
       if (!result.canceled && result.assets && result.assets[0]) {
         const asset = result.assets[0];
-        setVideoUri(asset.uri);
+        setVideoSource({
+          uri: asset.uri,
+          metadata: {
+            title: asset.name,
+            artist: "My Video App",
+          },
+        });
         setFileName(asset.name);
         setPosition(0);
       }
@@ -107,8 +125,16 @@ export default function VideoPlayer() {
     }
   };
 
-  const togglePiP = () => {
-    console.log("PiP mode activated - video will enter PiP when app goes to background");
+  const videoViewRef = useRef<VideoView>(null);
+
+  const togglePiP = async () => {
+    if (videoViewRef.current) {
+      try {
+        await videoViewRef.current.startPictureInPicture();
+      } catch (error) {
+        console.log("Error starting PiP:", error);
+      }
+    }
   };
 
   const formatTime = (millis: number) => {
@@ -138,13 +164,15 @@ export default function VideoPlayer() {
           resetControlsTimeout();
         }}
       >
-        {videoUri ? (
+        {videoSource ? (
           <>
             <VideoView
+              ref={videoViewRef}
               player={player}
               style={styles.video}
               allowsFullscreen
               allowsPictureInPicture
+              startsPictureInPictureAutomatically={true}
               contentFit="contain"
               nativeControls={false}
             />
@@ -251,7 +279,7 @@ export default function VideoPlayer() {
         )}
       </Pressable>
 
-      {videoUri && showControls && (
+      {videoSource && showControls && (
         <TouchableOpacity style={styles.changeVideoButton} onPress={pickVideo}>
           <Text style={styles.changeVideoText}>Change Video</Text>
         </TouchableOpacity>
